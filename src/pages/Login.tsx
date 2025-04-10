@@ -1,6 +1,6 @@
 
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,8 +27,26 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Login = () => {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>("login");
-  const { login, register: authRegister } = useAuth();
+  const { user, login, register: authRegister } = useAuth();
+  const navigate = useNavigate();
+
+  // Set the active tab based on the URL query parameter
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab === "register") {
+      setActiveTab("register");
+    }
+  }, [location]);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate(user.role === "admin" ? "/admin" : "/dashboard");
+    }
+  }, [user, navigate]);
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),

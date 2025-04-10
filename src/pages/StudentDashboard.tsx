@@ -5,22 +5,15 @@ import { getAllUsers } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { ChevronLeft, Trophy, User } from "lucide-react";
+import { ChevronLeft, Trophy, User, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const StudentDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // Redirect if not logged in
-  React.useEffect(() => {
-    if (!user) {
-      navigate("/login");
-    }
-  }, [user, navigate]);
-
   if (!user) {
-    return null; // Redirect will handle this
+    return null; // Protected route will handle this
   }
 
   // Get user's score
@@ -64,6 +57,16 @@ const StudentDashboard = () => {
                 <p className="text-3xl font-bold text-purple-700">{userScore}</p>
               </div>
             </CardContent>
+            <CardFooter className="justify-center">
+              <Button 
+                variant="default" 
+                className="bg-purple-600 hover:bg-purple-700"
+                onClick={() => navigate("/playground")}
+              >
+                <Code className="h-4 w-4 mr-2" />
+                Practice Now
+              </Button>
+            </CardFooter>
           </Card>
           
           {/* Leaderboard Card */}
@@ -112,9 +115,9 @@ const StudentDashboard = () => {
               <Button 
                 variant="outline" 
                 className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                onClick={() => navigate("/playground")}
+                onClick={() => navigate("/problems")}
               >
-                Go to Playground
+                View All Problems
               </Button>
             </CardFooter>
           </Card>

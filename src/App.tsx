@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Problems from "./pages/Problems";
 import Playground from "./pages/Playground";
@@ -25,11 +26,39 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/problems" element={<Problems />} />
-            <Route path="/playground" element={<Playground />} />
-            <Route path="/playground/:id" element={<Playground />} />
+            <Route 
+              path="/playground" 
+              element={
+                <ProtectedRoute requiredRole="student">
+                  <Playground />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/playground/:id" 
+              element={
+                <ProtectedRoute requiredRole="student">
+                  <Playground />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="/login" element={<Login />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/dashboard" element={<StudentDashboard />} />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute requiredRole="student">
+                  <StudentDashboard />
+                </ProtectedRoute>
+              } 
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
