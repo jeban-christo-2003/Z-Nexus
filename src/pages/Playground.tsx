@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Header from '@/components/Header';
 import { useToast } from '@/hooks/use-toast';
-import { toast } from "sonner";
+import { toast as sonnerToast } from "sonner";
 import { problems } from '@/data/problems';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateUserScore } from '@/services/auth';
@@ -102,7 +102,7 @@ const Playground = () => {
             if (user) {
               const scoreGain = 10; // Example score gain
               updateUserScore(user.id, (user.score || 0) + scoreGain);
-              toast.success(`You earned ${scoreGain} points!`);
+              sonnerToast.success(`You earned ${scoreGain} points!`);
             }
           } else {
             setOutput(`${testOutput}❌ Some tests failed\n\nExpected: [1, 2, 3]\nActual: [1, 2, 4]`);
@@ -144,7 +144,7 @@ const Playground = () => {
       // Update user score
       updateUserScore(user.id, (user.score || 0) + totalScore);
       
-      toast.success(`Submission successful! You earned ${totalScore} points.`);
+      sonnerToast.success(`Submission successful! You earned ${totalScore} points.`);
     }
     
     // Redirect to dashboard after a short delay
