@@ -10,6 +10,7 @@ interface User {
   email: string;
   role: "admin" | "student";
   score?: number;
+  rounds?: {[key: string]: number}; // Track scores for different rounds
 }
 
 // Mock users database
@@ -26,6 +27,11 @@ const USERS: User[] = [
     email: "john@example.com",
     role: "student",
     score: 85,
+    rounds: {
+      "1": 85,
+      "2": 70,
+      "3": 0,
+    }
   },
   {
     id: "3",
@@ -33,6 +39,11 @@ const USERS: User[] = [
     email: "jane@example.com",
     role: "student",
     score: 92,
+    rounds: {
+      "1": 92,
+      "2": 85,
+      "3": 0,
+    }
   },
   {
     id: "4",
@@ -40,6 +51,11 @@ const USERS: User[] = [
     email: "alex@example.com",
     role: "student",
     score: 78,
+    rounds: {
+      "1": 78,
+      "2": 65,
+      "3": 0,
+    }
   }
 ];
 
@@ -93,6 +109,11 @@ export const register = (name: string, email: string, password: string): Promise
         email,
         role: "student",
         score: 0,
+        rounds: {
+          "1": 0,
+          "2": 0,
+          "3": 0
+        }
       };
       
       USERS.push(newUser);
@@ -124,14 +145,67 @@ export const getAllUsers = (): User[] => {
   return USERS;
 };
 
-export const updateUserScore = (userId: string, score: number): void => {
+export const getUsersByRound = (round: string): User[] => {
+  return USERS.filter(u => u.role === "student");
+};
+
+export const updateUserScore = (userId: string, score: number, round: string = "1"): void => {
   const user = USERS.find(u => u.id === userId);
   if (user) {
+    // Update overall score
     user.score = score;
+    
+    // Update round-specific score
+    if (!user.rounds) {
+      user.rounds = {};
+    }
+    user.rounds[round] = score;
+    
     // Update current user if it's the same user
     if (currentUser && currentUser.id === userId) {
       currentUser.score = score;
+      if (!currentUser.rounds) {
+        currentUser.rounds = {};
+      }
+      currentUser.rounds[round] = score;
       localStorage.setItem("nexus_user", JSON.stringify(currentUser));
     }
   }
+};
+
+export const addParticipant = (name: string, email: string, password: string = "password123"): User | null => {
+  // Check if user already exists
+  if (USERS.some(u => u.email === email)) {
+    toast.error("User with this email already exists");
+    return null;
+  }
+  
+  // Create new user
+  const newUser: User = {
+    id: String(USERS.length + 1),
+    name,
+    email,
+    role: "student",
+    score: 0,
+    rounds: {
+      "1": 0,
+      "2": 0,
+      "3": 0
+    }
+  };
+  
+  USERS.push(newUser);
+  toast.success(`${name} added as a participant`);
+  return newUser;
+};
+
+export const removeParticipant = (userId: string): boolean => {
+  const index = USERS.findIndex(u => u.id === userId);
+  if (index !== -1) {
+    const userName = USERS[index].name;
+    USERS.splice(index, 1);
+    toast.success(`${userName} removed from participants`);
+    return true;
+  }
+  return false;
 };

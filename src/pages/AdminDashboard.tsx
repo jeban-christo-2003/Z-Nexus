@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllUsers } from "@/services/auth";
+import { getAllUsers, addParticipant, removeParticipant, getUsersByRound } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -9,6 +9,14 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
 import { 
   ChevronLeft, 
   Users, 
@@ -19,10 +27,21 @@ import {
   Plus, 
   ArrowDownAZ, 
   ArrowUpZA,
-  ChevronRight  // Add this import
+  ChevronRight,
+  Trash2,
+  Edit,
+  Save
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { problems } from "@/data/problems";
+
+// Form schema for adding participants
+const addParticipantSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email address"),
+});
+
+type AddParticipantFormValues = z.infer<typeof addParticipantSchema>;
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -33,6 +52,16 @@ const AdminDashboard = () => {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [activeTab, setActiveTab] = useState("users");
   const [selectedRound, setSelectedRound] = useState("1");
+  const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<string | null>(null);
+  
+  // Form for adding new participants
+  const addParticipantForm = useForm<AddParticipantFormValues>({
+    resolver: zodResolver(addParticipantSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+    },
+  });
   
   if (!user) {
     return null; // Protected route will handle this
@@ -63,6 +92,21 @@ const AdminDashboard = () => {
   // Count of students and admins
   const studentCount = allUsers.filter(u => u.role === "student").length;
   const adminCount = allUsers.filter(u => u.role === "admin").length;
+
+  // Handle add participant
+  const onAddParticipantSubmit = (data: AddParticipantFormValues) => {
+    const result = addParticipant(data.name, data.email);
+    if (result) {
+      addParticipantForm.reset();
+    }
+  };
+
+  // Handle delete participant
+  const handleDeleteParticipant = (userId: string) => {
+    if (removeParticipant(userId)) {
+      setConfirmDeleteUserId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-purple-50 flex flex-col">
@@ -148,6 +192,71 @@ const AdminDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent>
+                <div className="flex justify-between items-center mb-4">
+                  <div className="relative w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                      type="search"
+                      placeholder="Search users..."
+                      className="pl-8"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Participant
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New Participant</DialogTitle>
+                        <DialogDescription>
+                          Add a new student to the system. They will be assigned a default password.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form {...addParticipantForm}>
+                        <form onSubmit={addParticipantForm.handleSubmit(onAddParticipantSubmit)} className="space-y-4">
+                          <FormField
+                            control={addParticipantForm.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="John Doe" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={addParticipantForm.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="email@example.com" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <DialogFooter>
+                            <Button type="submit">Add Participant</Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                
                 <div className="rounded-lg border shadow-sm overflow-hidden">
                   <Table>
                     <TableHeader>
@@ -157,6 +266,7 @@ const AdminDashboard = () => {
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Score</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -175,6 +285,27 @@ const AdminDashboard = () => {
                             </span>
                           </TableCell>
                           <TableCell>{user.score !== undefined ? user.score : "N/A"}</TableCell>
+                          <TableCell>
+                            {user.role !== "admin" && (
+                              <div className="flex space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                  onClick={() => setConfirmDeleteUserId(user.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -182,6 +313,29 @@ const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Delete User Confirmation Dialog */}
+            <Dialog open={!!confirmDeleteUserId} onOpenChange={(open) => !open && setConfirmDeleteUserId(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Confirm Deletion</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to remove this participant? This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmDeleteUserId(null)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => confirmDeleteUserId && handleDeleteParticipant(confirmDeleteUserId)}
+                  >
+                    Delete
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
           
           <TabsContent value="leaderboard" className="space-y-4">
@@ -272,8 +426,14 @@ const AdminDashboard = () => {
                         
                         <div className="flex items-center gap-3">
                           <div className="text-right">
-                            <div className="text-sm text-gray-500">Score</div>
-                            <div className="text-xl font-bold text-purple-700">{student.score || 0}</div>
+                            <div className="text-sm text-gray-500">
+                              {selectedRound !== "all" ? `Round ${selectedRound} Score` : "Overall Score"}
+                            </div>
+                            <div className="text-xl font-bold text-purple-700">
+                              {selectedRound !== "all" && student.rounds 
+                                ? student.rounds[selectedRound] || 0 
+                                : student.score || 0}
+                            </div>
                           </div>
                           
                           <div className={`px-3 py-1 rounded-full text-xs font-medium
@@ -320,124 +480,177 @@ const AdminDashboard = () => {
               
               <CardContent>
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Available Problems</h3>
-                    <Button variant="outline" size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add New Problem
-                    </Button>
-                  </div>
-                  
-                  <Tabs defaultValue="easy">
-                    <TabsList className="grid grid-cols-3 w-[400px]">
-                      <TabsTrigger value="easy">Easy</TabsTrigger>
-                      <TabsTrigger value="medium">Medium</TabsTrigger>
-                      <TabsTrigger value="hard">Hard</TabsTrigger>
+                  <Tabs defaultValue="round1">
+                    <TabsList className="grid grid-cols-3 w-[400px] mb-6">
+                      <TabsTrigger value="round1">Round 1</TabsTrigger>
+                      <TabsTrigger value="round2">Round 2</TabsTrigger>
+                      <TabsTrigger value="round3">Round 3</TabsTrigger>
                     </TabsList>
                     
-                    <TabsContent value="easy" className="mt-4">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>ID</TableHead>
-                            <TableHead>Title</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Passkey</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {problems
-                            .filter(p => p.difficulty === "Easy")
-                            .map(problem => (
-                              <TableRow key={problem.id}>
-                                <TableCell>{problem.id}</TableCell>
-                                <TableCell className="font-medium">{problem.title}</TableCell>
-                                <TableCell>{problem.category}</TableCell>
-                                <TableCell>
-                                  <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs inline-block">
-                                    easy
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <ChevronRight className="h-4 w-4" />
-                                  </Button>
-                                </TableCell>
+                    <TabsContent value="round1" className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Round 1 Problems</h3>
+                        <Button variant="outline" size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Problem
+                        </Button>
+                      </div>
+                      
+                      <Tabs defaultValue="easy">
+                        <TabsList className="grid grid-cols-3 w-[400px]">
+                          <TabsTrigger value="easy">Easy</TabsTrigger>
+                          <TabsTrigger value="medium">Medium</TabsTrigger>
+                          <TabsTrigger value="hard">Hard</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="easy" className="mt-4">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>ID</TableHead>
+                                <TableHead>Title</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Passkey</TableHead>
+                                <TableHead>Actions</TableHead>
                               </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {problems
+                                .filter(p => p.difficulty === "Easy")
+                                .map(problem => (
+                                  <TableRow key={problem.id}>
+                                    <TableCell>{problem.id}</TableCell>
+                                    <TableCell className="font-medium">{problem.title}</TableCell>
+                                    <TableCell>{problem.category}</TableCell>
+                                    <TableCell>
+                                      <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs inline-block">
+                                        easy
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-2">
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                          <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                        </TabsContent>
+                        
+                        <TabsContent value="medium" className="mt-4">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>ID</TableHead>
+                                <TableHead>Title</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Passkey</TableHead>
+                                <TableHead>Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {problems
+                                .filter(p => p.difficulty === "Medium")
+                                .map(problem => (
+                                  <TableRow key={problem.id}>
+                                    <TableCell>{problem.id}</TableCell>
+                                    <TableCell className="font-medium">{problem.title}</TableCell>
+                                    <TableCell>{problem.category}</TableCell>
+                                    <TableCell>
+                                      <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs inline-block">
+                                        medium
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-2">
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                          <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                        </TabsContent>
+                        
+                        <TabsContent value="hard" className="mt-4">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>ID</TableHead>
+                                <TableHead>Title</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Passkey</TableHead>
+                                <TableHead>Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {problems
+                                .filter(p => p.difficulty === "Hard")
+                                .map(problem => (
+                                  <TableRow key={problem.id}>
+                                    <TableCell>{problem.id}</TableCell>
+                                    <TableCell className="font-medium">{problem.title}</TableCell>
+                                    <TableCell>{problem.category}</TableCell>
+                                    <TableCell>
+                                      <div className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs inline-block">
+                                        hard
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex space-x-2">
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                          <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                        </TabsContent>
+                      </Tabs>
                     </TabsContent>
                     
-                    <TabsContent value="medium" className="mt-4">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>ID</TableHead>
-                            <TableHead>Title</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Passkey</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {problems
-                            .filter(p => p.difficulty === "Medium")
-                            .map(problem => (
-                              <TableRow key={problem.id}>
-                                <TableCell>{problem.id}</TableCell>
-                                <TableCell className="font-medium">{problem.title}</TableCell>
-                                <TableCell>{problem.category}</TableCell>
-                                <TableCell>
-                                  <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs inline-block">
-                                    medium
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <ChevronRight className="h-4 w-4" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
+                    <TabsContent value="round2" className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Round 2 Problems</h3>
+                        <Button variant="outline" size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Problem
+                        </Button>
+                      </div>
+                      
+                      <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 text-amber-800">
+                        Round 2 problems can be configured once Round 1 is complete. You can prepare problems in advance.
+                      </div>
                     </TabsContent>
                     
-                    <TabsContent value="hard" className="mt-4">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>ID</TableHead>
-                            <TableHead>Title</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Passkey</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {problems
-                            .filter(p => p.difficulty === "Hard")
-                            .map(problem => (
-                              <TableRow key={problem.id}>
-                                <TableCell>{problem.id}</TableCell>
-                                <TableCell className="font-medium">{problem.title}</TableCell>
-                                <TableCell>{problem.category}</TableCell>
-                                <TableCell>
-                                  <div className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs inline-block">
-                                    hard
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <ChevronRight className="h-4 w-4" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
+                    <TabsContent value="round3" className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Round 3 Problems</h3>
+                        <Button variant="outline" size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Problem
+                        </Button>
+                      </div>
+                      
+                      <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 text-amber-800">
+                        Round 3 problems can be configured once Round 2 is complete. You can prepare problems in advance.
+                      </div>
                     </TabsContent>
                   </Tabs>
                 </div>

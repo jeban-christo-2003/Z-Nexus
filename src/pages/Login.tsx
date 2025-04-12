@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 const loginSchema = z.object({
   email: z.string().min(1, "Username or email is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  passkey: z.string().optional(),
+  passkey: z.string().min(1, "Passkey is required"),
 });
 
 const registerSchema = z.object({
@@ -74,25 +75,22 @@ const Login = () => {
   const onLoginSubmit = async (data: LoginFormValues) => {
     try {
       if (data.email === "Nexus_admin" && data.password === 'Z*N!E3X"U7#') {
-        await login(data.email, data.password);
-        navigate('/admin');
-        return;
+        if (data.passkey === "0000") {
+          await login(data.email, data.password);
+          navigate('/admin');
+          return;
+        } else {
+          toast.error("Invalid admin passkey. Please try again.");
+          return;
+        }
       }
       
       await login(data.email, data.password);
       
-      if (data.passkey) {
-        if (["0000", "easy", "medium", "hard"].includes(data.passkey)) {
-          if (data.passkey === "0000") {
-            navigate('/admin');
-          } else {
-            navigate(`/playground?passkey=${data.passkey}`);
-          }
-        } else {
-          toast.error("Invalid passkey. Please try again.");
-        }
+      if (["easy", "medium", "hard"].includes(data.passkey)) {
+        navigate(`/playground?passkey=${data.passkey}`);
       } else {
-        navigate('/dashboard');
+        toast.error("Invalid passkey. Please try again.");
       }
     } catch (error) {
     }
@@ -163,13 +161,13 @@ const Login = () => {
                     name="passkey"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Passkey (Optional)</FormLabel>
+                        <FormLabel>Passkey <span className="text-red-500">*</span></FormLabel>
                         <FormControl>
                           <Input type="password" placeholder="Enter contest passkey" {...field} />
                         </FormControl>
                         <FormMessage />
                         <p className="text-xs text-gray-500">
-                          Enter a passkey to access specific problem sets
+                          Enter passkey to access problem sets: easy, medium, hard or admin code
                         </p>
                       </FormItem>
                     )}
@@ -194,7 +192,8 @@ const Login = () => {
                       <Button 
                         variant="outline" 
                         onClick={() => {
-                          navigate('/playground?passkey=easy');
+                          navigate('/login');
+                          toast.success("Please log in with your credentials and use the 'easy' passkey");
                         }}
                         className="bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
                       >
@@ -203,7 +202,8 @@ const Login = () => {
                       <Button 
                         variant="outline"
                         onClick={() => {
-                          navigate('/playground?passkey=medium');
+                          navigate('/login');
+                          toast.success("Please log in with your credentials and use the 'medium' passkey");
                         }}
                         className="bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
                       >
@@ -212,7 +212,8 @@ const Login = () => {
                       <Button 
                         variant="outline"
                         onClick={() => {
-                          navigate('/playground?passkey=hard');
+                          navigate('/login');
+                          toast.success("Please log in with your credentials and use the 'hard' passkey");
                         }}
                         className="bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
                       >
@@ -222,10 +223,10 @@ const Login = () => {
                   </div>
                   <Button
                     variant="default"
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/login')}
                     className="w-full bg-purple-600 hover:bg-purple-700"
                   >
-                    Go to Dashboard
+                    Back to Login
                   </Button>
                 </div>
               ) : (
