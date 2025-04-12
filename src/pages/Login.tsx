@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -14,7 +13,7 @@ import Header from "@/components/Header";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z.string().min(1, "Username or email is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   passkey: z.string().optional(),
 });
@@ -35,7 +34,6 @@ const Login = () => {
   const navigate = useNavigate();
   const [showPasskey, setShowPasskey] = useState(false);
 
-  // Set the active tab based on the URL query parameter
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
@@ -44,7 +42,6 @@ const Login = () => {
     }
   }, [location]);
 
-  // Redirect if already logged in
   useEffect(() => {
     if (user) {
       if (user.role === "admin") {
@@ -76,38 +73,28 @@ const Login = () => {
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     try {
-      // Check for admin credentials first
       if (data.email === "Nexus_admin" && data.password === 'Z*N!E3X"U7#') {
-        // Admin login - special handling
         await login(data.email, data.password);
-        // Admin always goes to admin dashboard
         navigate('/admin');
         return;
       }
       
-      // Regular user login
       await login(data.email, data.password);
       
-      // After successful login, check if passkey was provided
       if (data.passkey) {
-        // Validate passkey
         if (["0000", "easy", "medium", "hard"].includes(data.passkey)) {
           if (data.passkey === "0000") {
-            // Admin passkey - redirect to admin dashboard if they used the admin passkey
             navigate('/admin');
           } else {
-            // Valid difficulty passkey - redirect to correct problem set
             navigate(`/playground?passkey=${data.passkey}`);
           }
         } else {
           toast.error("Invalid passkey. Please try again.");
         }
       } else {
-        // No passkey, show dashboard
         navigate('/dashboard');
       }
     } catch (error) {
-      // Error handling is done in the auth context
     }
   };
 
@@ -116,7 +103,6 @@ const Login = () => {
       await authRegister(data.name, data.email, data.password);
       setShowPasskey(true);
     } catch (error) {
-      // Error handling is done in the auth context
     }
   };
 
@@ -149,7 +135,7 @@ const Login = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Username</FormLabel>
+                        <FormLabel>Username or Email</FormLabel>
                         <FormControl>
                           <Input placeholder="username or email" {...field} />
                         </FormControl>
