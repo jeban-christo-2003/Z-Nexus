@@ -55,6 +55,7 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
   ]);
   const [constraints, setConstraints] = useState<string[]>(["1 ≤ arr.length ≤ 1000"]);
   const [newConstraint, setNewConstraint] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<ProblemFormValues>({
     resolver: zodResolver(problemSchema),
@@ -73,9 +74,14 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
 
   // Load problem data if editing
   useEffect(() => {
-    if (problemId) {
+    if (problemId && open) {
+      setIsLoading(true);
       const problem = getProblemById(problemId);
+      
       if (problem) {
+        console.log("Loading problem for editing:", problem);
+        
+        // Reset form with problem data
         form.reset({
           title: problem.title,
           difficulty: problem.difficulty,
@@ -88,9 +94,29 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
           testCases: problem.testCases || []
         });
         
+        // Set state variables
         setConstraints(problem.constraints);
-        setTestCases(problem.testCases || []);
+        setTestCases(problem.testCases || [{ input: "", expectedOutput: "", isHidden: false }]);
+      } else {
+        toast.error("Problem not found");
       }
+      setIsLoading(false);
+    } else if (open) {
+      // Reset form for new problem
+      form.reset({
+        title: "",
+        difficulty: "Easy",
+        category: "Arrays",
+        description: "",
+        example: "",
+        constraints: ["1 ≤ arr.length ≤ 1000"],
+        starterCode: "function solution(input) {\n  // Your code here\n}\n",
+        passkey: "",
+        testCases: [{ input: "", expectedOutput: "", isHidden: false }]
+      });
+      
+      setConstraints(["1 ≤ arr.length ≤ 1000"]);
+      setTestCases([{ input: "", expectedOutput: "", isHidden: false }]);
     }
   }, [problemId, open, form]);
 
@@ -106,7 +132,7 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
     }
   };
 
-  const handleTestCaseChange = (index: number, field: string, value: string | boolean) => {
+  const handleTestCaseChange = (index: number, field: keyof TestCase, value: string | boolean) => {
     const updatedTestCases = [...testCases];
     updatedTestCases[index] = { ...updatedTestCases[index], [field]: value };
     setTestCases(updatedTestCases);
@@ -127,40 +153,52 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
     }
   };
 
-  const onSubmit = (data: ProblemFormValues) => {
+  const onSubmit = async (data: ProblemFormValues) => {
     // Validate testCases
     if (testCases.some(tc => !tc.input || !tc.expectedOutput)) {
       toast.error("All test cases must have input and expected output");
       return;
     }
 
-    // Prepare the problem data with all required fields
-    const problemData: Omit<Problem, "id"> = {
-      title: data.title,
-      difficulty: data.difficulty,
-      category: data.category,
-      description: data.description,
-      example: data.example,
-      constraints,
-      starterCode: data.starterCode,
-      // Default passkey to difficulty if not provided
-      passkey: data.passkey || data.difficulty.toLowerCase(),
-      testCases
-    };
+    setIsLoading(true);
 
     try {
+      // Prepare the problem data with all required fields
+      const problemData: Omit<Problem, "id"> = {
+        title: data.title,
+        difficulty: data.difficulty,
+        category: data.category,
+        description: data.description,
+        example: data.example,
+        constraints: constraints,
+        starterCode: data.starterCode,
+        // Default passkey to difficulty if not provided
+        passkey: data.passkey || data.difficulty.toLowerCase(),
+        testCases: testCases
+      };
+
+      console.log("Saving problem data:", problemData);
+
       if (problemId) {
         // Update existing problem
-        updateProblem(problemId, problemData);
+        const updated = await updateProblem(problemId, problemData);
+        if (updated) {
+          toast.success(`Problem "${data.title}" updated successfully`);
+        }
       } else {
         // Add new problem
-        addProblem(problemData);
+        const added = await addProblem(problemData);
+        if (added) {
+          toast.success(`Problem "${data.title}" added successfully`);
+        }
       }
       
       onClose();
     } catch (error) {
       console.error("Error saving problem:", error);
       toast.error("Failed to save problem");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -203,6 +241,7 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
+                        value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -410,12 +449,16 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                 Cancel
               </Button>
-              <Button type="submit">
-                <Save className="h-4 w-4 mr-2" />
-                {problemId ? "Update Problem" : "Create Problem"}
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Saving..." : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    {problemId ? "Update Problem" : "Create Problem"}
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </form>

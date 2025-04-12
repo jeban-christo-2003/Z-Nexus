@@ -267,7 +267,7 @@ export const removeParticipant = (userId: string): boolean => {
   return false;
 };
 
-// New functions for problem management
+// Problem management functions
 export const addProblem = (problem: Omit<Problem, "id">): Problem => {
   const newId = CUSTOM_PROBLEMS.length > 0 
     ? Math.max(...CUSTOM_PROBLEMS.map(p => p.id)) + 1 
@@ -284,13 +284,50 @@ export const addProblem = (problem: Omit<Problem, "id">): Problem => {
 };
 
 export const updateProblem = (id: number, updatedProblem: Partial<Problem>): Problem | null => {
+  // Find the problem index to update
   const index = CUSTOM_PROBLEMS.findIndex(p => p.id === id);
+  
+  // If found in custom problems, update it
   if (index !== -1) {
-    CUSTOM_PROBLEMS[index] = { ...CUSTOM_PROBLEMS[index], ...updatedProblem };
+    // Create a complete updated problem object
+    CUSTOM_PROBLEMS[index] = { 
+      ...CUSTOM_PROBLEMS[index], 
+      ...updatedProblem,
+      // Ensure these fields are properly updated
+      title: updatedProblem.title || CUSTOM_PROBLEMS[index].title,
+      difficulty: updatedProblem.difficulty || CUSTOM_PROBLEMS[index].difficulty,
+      category: updatedProblem.category || CUSTOM_PROBLEMS[index].category,
+      description: updatedProblem.description || CUSTOM_PROBLEMS[index].description,
+      example: updatedProblem.example || CUSTOM_PROBLEMS[index].example,
+      constraints: updatedProblem.constraints || CUSTOM_PROBLEMS[index].constraints,
+      starterCode: updatedProblem.starterCode || CUSTOM_PROBLEMS[index].starterCode,
+      passkey: updatedProblem.passkey || CUSTOM_PROBLEMS[index].passkey,
+      testCases: updatedProblem.testCases || CUSTOM_PROBLEMS[index].testCases,
+    };
+    
     toast.success(`Problem "${CUSTOM_PROBLEMS[index].title}" updated successfully`);
     return CUSTOM_PROBLEMS[index];
   }
   
+  // If not found in custom problems, try to find it in default problems
+  // We can't modify default problems directly, so we'll create a custom version
+  const defaultProblem = getProblemById(id);
+  if (defaultProblem) {
+    // Create a new custom problem based on the default one with updates
+    const customizedProblem: Problem = {
+      ...defaultProblem,
+      ...updatedProblem,
+      id: CUSTOM_PROBLEMS.length > 0 
+        ? Math.max(...CUSTOM_PROBLEMS.map(p => p.id)) + 1 
+        : 100
+    };
+    
+    CUSTOM_PROBLEMS.push(customizedProblem);
+    toast.success(`Problem "${customizedProblem.title}" customized and saved`);
+    return customizedProblem;
+  }
+  
+  toast.error("Problem not found");
   return null;
 };
 
@@ -311,7 +348,17 @@ export const getAllProblems = (): Problem[] => {
 };
 
 export const getProblemById = (id: number): Problem | null => {
-  return CUSTOM_PROBLEMS.find(p => p.id === id) || null;
+  // First check custom problems
+  const customProblem = CUSTOM_PROBLEMS.find(p => p.id === id);
+  if (customProblem) {
+    return customProblem;
+  }
+  
+  // If not found in custom problems, check default problems
+  // Import problems from data to avoid circular dependencies
+  const { problems } = require("../data/problems");
+  const defaultProblem = problems.find((p: Problem) => p.id === id);
+  return defaultProblem || null;
 };
 
 export const validateCode = (code: string, problemId: number): { passed: boolean, results: { input: string, expected: string, actual: string, passed: boolean }[] } => {
