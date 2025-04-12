@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -25,47 +24,59 @@ const Header = () => {
           </Link>
         </div>
         
-        <nav className="hidden md:flex items-center gap-6">
-          <Link 
-            to="/" 
-            className={`flex items-center gap-2 ${isActive('/') ? 'text-purple-700 font-medium' : 'text-gray-600 hover:text-purple-600 transition-colors'}`}
-          >
-            <Home className="h-4 w-4" />
-            Home
-          </Link>
+        <nav className="flex items-center gap-6">
+          {user ? (
+            <>
+              <Link 
+                to="/home" 
+                className={`flex items-center gap-2 ${isActive('/home') ? 'text-purple-700 font-medium' : 'text-gray-600 hover:text-purple-600 transition-colors'}`}
+              >
+                <Home className="h-4 w-4" />
+                Home
+              </Link>
 
-          <Link 
-            to="/problems" 
-            className={`flex items-center gap-2 ${isActive('/problems') ? 'text-purple-700 font-medium' : 'text-gray-600 hover:text-purple-600 transition-colors'}`}
-          >
-            <FileText className="h-4 w-4" />
-            Problems
-          </Link>
-          
-          <Link 
-            to="/playground" 
-            className={`flex items-center gap-2 ${isActive('/playground') ? 'text-purple-700 font-medium' : 'text-gray-600 hover:text-purple-600 transition-colors'}`}
-          >
-            <Code className="h-4 w-4" />
-            Playground
-          </Link>
-          
-          {user && (
+              <Link 
+                to="/problems" 
+                className={`flex items-center gap-2 ${isActive('/problems') ? 'text-purple-700 font-medium' : 'text-gray-600 hover:text-purple-600 transition-colors'}`}
+              >
+                <FileText className="h-4 w-4" />
+                Problems
+              </Link>
+              
+              {user.role === "student" && (
+                <Link 
+                  to="/playground" 
+                  className={`flex items-center gap-2 ${isActive('/playground') ? 'text-purple-700 font-medium' : 'text-gray-600 hover:text-purple-600 transition-colors'}`}
+                >
+                  <Code className="h-4 w-4" />
+                  Playground
+                </Link>
+              )}
+              
+              <Link 
+                to={user.role === "admin" ? "/admin" : "/dashboard"} 
+                className={`flex items-center gap-2 ${
+                  isActive('/admin') || isActive('/dashboard') 
+                    ? 'text-purple-700 font-medium' 
+                    : 'text-gray-600 hover:text-purple-600 transition-colors'
+                }`}
+              >
+                <Trophy className="h-4 w-4" />
+                Dashboard
+              </Link>
+            </>
+          ) : (
             <Link 
-              to={user.role === "admin" ? "/admin" : "/dashboard"} 
-              className={`flex items-center gap-2 ${
-                isActive('/admin') || isActive('/dashboard') 
-                  ? 'text-purple-700 font-medium' 
-                  : 'text-gray-600 hover:text-purple-600 transition-colors'
-              }`}
+              to="/login" 
+              className={`flex items-center gap-2 ${isActive('/login') ? 'text-purple-700 font-medium' : 'text-gray-600 hover:text-purple-600 transition-colors'}`}
             >
-              <Trophy className="h-4 w-4" />
-              Dashboard
+              <UserCircle className="h-4 w-4" />
+              Login
             </Link>
           )}
         </nav>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           {user ? (
             <>
               <div className="mr-2 hidden md:block">

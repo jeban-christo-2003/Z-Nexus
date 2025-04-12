@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { login, register, logout, getCurrentUser } from "../services/auth";
 import { useNavigate } from "react-router-dom";
@@ -51,7 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const loggedInUser = await login(email, password);
       setUser(loggedInUser);
       toast.success("Login successful!");
-      navigate(loggedInUser.role === "admin" ? "/admin" : "/dashboard");
+      navigate(loggedInUser.role === "admin" ? "/admin" : "/home");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to login");
       throw error;
@@ -66,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const registeredUser = await register(name, email, password);
       setUser(registeredUser);
       toast.success("Registration successful!");
-      navigate("/dashboard");
+      navigate("/login");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to register");
       throw error;
