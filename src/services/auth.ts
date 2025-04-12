@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { Problem, TestCase } from "../data/problems";
 
 // Mock data for demonstration purposes
 // In a real app, this would be replaced with actual backend calls
@@ -20,25 +21,6 @@ interface Submission {
   timestamp: string;
   passed: boolean;
   score: number;
-}
-
-interface Problem {
-  id: number;
-  title: string;
-  difficulty: "Easy" | "Medium" | "Hard";
-  category: string;
-  description: string;
-  example: string;
-  constraints: string[];
-  starterCode: string;
-  passkey: string;
-  testCases: TestCase[];
-}
-
-interface TestCase {
-  input: string;
-  expectedOutput: string;
-  isHidden: boolean;
 }
 
 // Mock users database

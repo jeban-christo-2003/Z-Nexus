@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -13,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { X, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
 import { addProblem, updateProblem, getProblemById } from "@/services/auth";
+import { Problem, TestCase } from "@/data/problems";
 
 // Form schema for the problem
 const problemSchema = z.object({
@@ -34,7 +34,7 @@ const testCaseSchema = z.object({
 });
 
 type ProblemFormValues = z.infer<typeof problemSchema> & {
-  testCases: z.infer<typeof testCaseSchema>[];
+  testCases: TestCase[];
 };
 
 interface ProblemEditorProps {
@@ -50,7 +50,7 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
   problemId,
   round = "1"
 }) => {
-  const [testCases, setTestCases] = useState<any[]>([
+  const [testCases, setTestCases] = useState<TestCase[]>([
     { input: "", expectedOutput: "", isHidden: false }
   ]);
   const [constraints, setConstraints] = useState<string[]>(["1 ≤ arr.length ≤ 1000"]);
@@ -84,7 +84,7 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
           example: problem.example,
           constraints: problem.constraints,
           starterCode: problem.starterCode,
-          passkey: problem.passkey,
+          passkey: problem.passkey || "",
           testCases: problem.testCases || []
         });
         
@@ -92,7 +92,7 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
         setTestCases(problem.testCases || []);
       }
     }
-  }, [problemId, open]);
+  }, [problemId, open, form]);
 
   const handleAddTestCase = () => {
     setTestCases([...testCases, { input: "", expectedOutput: "", isHidden: false }]);
@@ -134,13 +134,18 @@ const ProblemEditor: React.FC<ProblemEditorProps> = ({
       return;
     }
 
-    // Prepare the problem data
-    const problemData = {
-      ...data,
+    // Prepare the problem data with all required fields
+    const problemData: Omit<Problem, "id"> = {
+      title: data.title,
+      difficulty: data.difficulty,
+      category: data.category,
+      description: data.description,
+      example: data.example,
       constraints,
-      testCases,
+      starterCode: data.starterCode,
       // Default passkey to difficulty if not provided
-      passkey: data.passkey || data.difficulty.toLowerCase()
+      passkey: data.passkey || data.difficulty.toLowerCase(),
+      testCases
     };
 
     try {

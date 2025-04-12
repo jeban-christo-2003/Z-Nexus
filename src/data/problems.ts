@@ -1,5 +1,24 @@
 
-export const problems = [
+export interface Problem {
+  id: number;
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  category: string;
+  description: string;
+  example: string;
+  constraints: string[];
+  starterCode: string;
+  passkey?: string;
+  testCases?: TestCase[];
+}
+
+export interface TestCase {
+  input: string;
+  expectedOutput: string;
+  isHidden: boolean;
+}
+
+export const problems: Problem[] = [
   {
     id: 1,
     title: "Two Sum",
@@ -13,7 +32,20 @@ export const problems = [
       "-109 ≤ target ≤ 109",
       "Only one valid answer exists."
     ],
-    starterCode: "function twoSum(nums, target) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// twoSum([2, 7, 11, 15], 9) should return [0, 1]"
+    starterCode: "function twoSum(nums, target) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// twoSum([2, 7, 11, 15], 9) should return [0, 1]",
+    passkey: "easy",
+    testCases: [
+      {
+        input: "[2,7,11,15], 9",
+        expectedOutput: "[0,1]",
+        isHidden: false
+      },
+      {
+        input: "[3,2,4], 6",
+        expectedOutput: "[1,2]",
+        isHidden: false
+      }
+    ]
   },
   {
     id: 2,
@@ -27,7 +59,15 @@ export const problems = [
       "s[i] is a printable ascii character.",
       "Do it in-place with O(1) extra memory."
     ],
-    starterCode: "function reverseString(s) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// reverseString(['h','e','l','l','o']) should modify the array to ['o','l','l','e','h']"
+    starterCode: "function reverseString(s) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// reverseString(['h','e','l','l','o']) should modify the array to ['o','l','l','e','h']",
+    passkey: "easy",
+    testCases: [
+      {
+        input: "['h','e','l','l','o']",
+        expectedOutput: "['o','l','l','e','h']",
+        isHidden: false
+      }
+    ]
   },
   {
     id: 3,
@@ -43,7 +83,15 @@ export const problems = [
       "1 ≤ m + n ≤ 200",
       "-109 ≤ nums1[i], nums2[j] ≤ 109"
     ],
-    starterCode: "function merge(nums1, m, nums2, n) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// merge([1,2,3,0,0,0], 3, [2,5,6], 3) should modify nums1 to be [1,2,2,3,5,6]"
+    starterCode: "function merge(nums1, m, nums2, n) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// merge([1,2,3,0,0,0], 3, [2,5,6], 3) should modify nums1 to be [1,2,2,3,5,6]",
+    passkey: "medium",
+    testCases: [
+      {
+        input: "[1,2,3,0,0,0], 3, [2,5,6], 3",
+        expectedOutput: "[1,2,2,3,5,6]",
+        isHidden: false
+      }
+    ]
   },
   {
     id: 4,
@@ -56,7 +104,20 @@ export const problems = [
       "The number of nodes in the tree is in the range [1, 104].",
       "-231 ≤ Node.val ≤ 231 - 1"
     ],
-    starterCode: "/**\n * Definition for a binary tree node.\n * function TreeNode(val, left, right) {\n *     this.val = (val===undefined ? 0 : val)\n *     this.left = (left===undefined ? null : left)\n *     this.right = (right===undefined ? null : right)\n * }\n */\n\nfunction isValidBST(root) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// isValidBST(new TreeNode(2, new TreeNode(1), new TreeNode(3))) should return true"
+    starterCode: "/**\n * Definition for a binary tree node.\n * function TreeNode(val, left, right) {\n *     this.val = (val===undefined ? 0 : val)\n *     this.left = (left===undefined ? null : left)\n *     this.right = (right===undefined ? null : right)\n * }\n */\n\nfunction isValidBST(root) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// isValidBST(new TreeNode(2, new TreeNode(1), new TreeNode(3))) should return true",
+    passkey: "hard",
+    testCases: [
+      {
+        input: "[2,1,3]",
+        expectedOutput: "true",
+        isHidden: false
+      },
+      {
+        input: "[5,1,4,null,null,3,6]",
+        expectedOutput: "false",
+        isHidden: false
+      }
+    ]
   },
   {
     id: 5,
@@ -70,6 +131,14 @@ export const problems = [
       "2 ≤ n ≤ 105",
       "0 ≤ height[i] ≤ 104"
     ],
-    starterCode: "function maxArea(height) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// maxArea([1,8,6,2,5,4,8,3,7]) should return 49"
+    starterCode: "function maxArea(height) {\n  // Write your code here\n  \n}\n\n// Example usage:\n// maxArea([1,8,6,2,5,4,8,3,7]) should return 49",
+    passkey: "medium",
+    testCases: [
+      {
+        input: "[1,8,6,2,5,4,8,3,7]",
+        expectedOutput: "49",
+        isHidden: false
+      }
+    ]
   }
 ];
