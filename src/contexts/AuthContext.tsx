@@ -10,6 +10,15 @@ interface User {
   email: string;
   role: "admin" | "student";
   score?: number;
+  rounds?: {[key: string]: number}; // Track scores for different rounds
+  problemsSolved?: number; // Track number of problems solved
+  lastSubmission?: string; // Timestamp of last submission
+  submissions?: {
+    problemId: number;
+    timestamp: string;
+    passed: boolean;
+    score: number;
+  }[]; // Track all submissions
 }
 
 interface AuthContextType {
