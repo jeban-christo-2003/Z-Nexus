@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllUsers } from "@/services/auth";
@@ -8,7 +9,18 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Users, UserCheck, UserX, Trophy, Search, Plus, ArrowDownAZ, ArrowUpZA } from "lucide-react";
+import { 
+  ChevronLeft, 
+  Users, 
+  UserCheck, 
+  UserX, 
+  Trophy, 
+  Search, 
+  Plus, 
+  ArrowDownAZ, 
+  ArrowUpZA,
+  ChevronRight  // Add this import
+} from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { problems } from "@/data/problems";
 
