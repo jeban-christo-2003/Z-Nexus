@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
-  Eye, EyeOff, Play, Check, Timer, Book, AlertCircle, 
+  Eye, EyeOff, Check, Timer, Book, AlertCircle, 
   RefreshCw, Copy, Save, ChevronRight, ChevronLeft 
 } from "lucide-react";
 import Header from '@/components/Header';
@@ -23,38 +24,37 @@ const Playground = () => {
   const { id } = useParams();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const problemId = id ? parseInt(id) : undefined;
   
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("");
   const [isBlindMode, setIsBlindMode] = useState(true);
-  const [isRunning, setIsRunning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedProblem, setSelectedProblem] = useState<any>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState("javascript");
+  const [exitWarningCount, setExitWarningCount] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
   
+  // Check if we reached the time limit
   useEffect(() => {
-    if (problemId && problems) {
-      const problem = problems.find(p => p.id === problemId);
-      if (problem) {
-        setSelectedProblem(problem);
-        setCode(problem.starterCode || "// Start coding here");
-      }
-    } else {
-      // Default code for playground mode
-      setCode('// Start coding here in blind mode\n\nfunction example(input) {\n  // Your solution\n  return input;\n}\n\n// Test your code\nconsole.log(example("test"));');
+    if (timeLeft <= 0 && isTimerRunning) {
+      // Time's up, auto-submit
+      submitCode();
     }
-  }, [problemId]);
+  }, [timeLeft]);
   
-  // Timer effect
+  // Timer for the 25-minute countdown
   useEffect(() => {
     let intervalId: number | undefined;
     
     if (isTimerRunning) {
       intervalId = window.setInterval(() => {
-        setElapsedTime(prevTime => prevTime + 1);
+        setTimeLeft(prevTime => Math.max(0, prevTime - 1));
       }, 1000);
     }
     
@@ -63,6 +63,91 @@ const Playground = () => {
     };
   }, [isTimerRunning]);
   
+  // Get language placeholder or starter code
+  const getLanguageStarter = (language: string) => {
+    switch (language) {
+      case "javascript":
+        return "// Write your JavaScript solution here\n\nfunction solution(input) {\n  // Your code here\n}\n";
+      case "python":
+        return "# Write your Python solution here\n\ndef solution(input):\n    # Your code here\n    pass\n";
+      case "java":
+        return "// Write your Java solution here\n\npublic class Solution {\n    public static void main(String[] args) {\n        // Your code here\n    }\n}\n";
+      case "c":
+        return "// Write your C solution here\n\n#include <stdio.h>\n\nint main() {\n    // Your code here\n    return 0;\n}\n";
+      case "cpp":
+        return "// Write your C++ solution here\n\n#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    return 0;\n}\n";
+      default:
+        return "// Write your solution here";
+    }
+  };
+  
+  useEffect(() => {
+    // Extract passkey from URL query params
+    const queryParams = new URLSearchParams(location.search);
+    const passkey = queryParams.get('passkey');
+    
+    // Set problems based on passkey
+    if (passkey && problems) {
+      let filteredProblems;
+      let difficulty;
+      
+      switch (passkey) {
+        case "easy":
+          filteredProblems = problems.filter(p => p.difficulty === "Easy");
+          difficulty = "Easy";
+          break;
+        case "medium":
+          filteredProblems = problems.filter(p => p.difficulty === "Medium");
+          difficulty = "Medium";
+          break;
+        case "hard":
+          filteredProblems = problems.filter(p => p.difficulty === "Hard");
+          difficulty = "Hard";
+          break;
+        default:
+          filteredProblems = problems;
+          difficulty = "Mixed";
+      }
+      
+      // If we have a specific problem ID, get that problem
+      if (problemId && filteredProblems) {
+        const problem = filteredProblems.find(p => p.id === problemId);
+        if (problem) {
+          setSelectedProblem(problem);
+          setCode(getLanguageStarter(selectedLanguage));
+        } else {
+          // If problem not found, redirect to first problem in filtered list
+          if (filteredProblems.length > 0) {
+            navigate(`/playground/${filteredProblems[0].id}?passkey=${passkey}`);
+          }
+        }
+      } else if (filteredProblems && filteredProblems.length > 0) {
+        // If no specific problem, redirect to first problem in filtered list
+        navigate(`/playground/${filteredProblems[0].id}?passkey=${passkey}`);
+      }
+    } else if (problemId && problems) {
+      const problem = problems.find(p => p.id === problemId);
+      if (problem) {
+        setSelectedProblem(problem);
+        setCode(getLanguageStarter(selectedLanguage));
+      }
+    } else {
+      // No passkey and no problem ID, show empty editor
+      setCode(getLanguageStarter(selectedLanguage));
+      setSelectedProblem(null);
+    }
+  }, [problemId, location.search]);
+  
+  // Update code when language changes
+  useEffect(() => {
+    if (selectedProblem) {
+      setCode(getLanguageStarter(selectedLanguage));
+    } else {
+      setCode(getLanguageStarter(selectedLanguage));
+    }
+  }, [selectedLanguage]);
+  
+  // Format time (MM:SS)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -76,19 +161,34 @@ const Playground = () => {
     setCode(e.target.value);
   };
   
-  const runCode = () => {
-    setIsRunning(true);
-    setShowResults(true);
+  const handleFullscreenExit = () => {
+    const newCount = exitWarningCount + 1;
+    setExitWarningCount(newCount);
+    
+    if (newCount >= 3) {
+      // Auto-submit after 3 warnings
+      submitCode();
+      navigate('/dashboard');
+    } else {
+      toast({
+        title: `Warning (${newCount}/3)`,
+        description: "Exiting fullscreen mode may result in automatic submission.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const submitCode = () => {
+    setIsSubmitting(true);
+    setIsTimerRunning(false);
     
     try {
-      // In a real app, this would send code to a backend for execution
-      // For our demo, we'll simulate execution with a timeout
       setTimeout(() => {
         if (selectedProblem) {
-          const testOutput = `Running tests for "${selectedProblem.title}"...\n\n`;
+          const testOutput = `Evaluating submission for "${selectedProblem.title}"...\n\n`;
           
-          // Simulate test results
-          const passedTests = Math.random() > 0.5; // Random pass/fail for demo
+          // Simulate test results - in real implementation would run actual tests
+          const passedTests = Math.random() > 0.3; // 70% pass chance for demo
           
           if (passedTests) {
             setOutput(`${testOutput}✅ All tests passed!\n\nYour solution successfully solved the problem.`);
@@ -100,7 +200,13 @@ const Playground = () => {
             
             // Update user score if logged in
             if (user) {
-              const scoreGain = 10; // Example score gain
+              let difficultyMultiplier = 1;
+              if (selectedProblem.difficulty === "Medium") difficultyMultiplier = 2;
+              if (selectedProblem.difficulty === "Hard") difficultyMultiplier = 3;
+              
+              const timeBonus = Math.max(0, (25 * 60 - elapsedTime)) / 60; // Time bonus based on time left
+              const scoreGain = Math.round(10 * difficultyMultiplier + timeBonus);
+              
               updateUserScore(user.id, (user.score || 0) + scoreGain);
               sonnerToast.success(`You earned ${scoreGain} points!`);
             }
@@ -113,52 +219,25 @@ const Playground = () => {
             });
           }
         } else {
-          // Playground mode - just show the code execution would happen
-          setOutput(`Console Output:\n\nProgram started\n> example("test") returned "test"\n\nProgram completed in 0.05s`);
-          toast({
-            title: "Code Executed",
-            description: "Check the output panel for results",
-          });
+          // No problem selected scenario
+          setOutput(`Evaluation Result:\n\nNo problem was selected for evaluation.`);
         }
         
-        setIsRunning(false);
-        setIsTimerRunning(false);
+        setIsSubmitting(false);
+        
+        // Redirect to dashboard after a short delay
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 3000);
       }, 1500);
     } catch (error) {
       setOutput(`Error: ${error}`);
-      setIsRunning(false);
+      setIsSubmitting(false);
     }
-  };
-  
-  const submitCode = () => {
-    runCode();
-    setIsTimerRunning(false);
-    
-    // Simulate submission with a score update
-    if (user) {
-      // Calculate score based on elapsed time and problem difficulty
-      const baseScore = selectedProblem ? selectedProblem.difficulty * 5 : 5;
-      const timeBonus = Math.max(0, 300 - elapsedTime) / 10;
-      const totalScore = Math.round(baseScore + timeBonus);
-      
-      // Update user score
-      updateUserScore(user.id, (user.score || 0) + totalScore);
-      
-      sonnerToast.success(`Submission successful! You earned ${totalScore} points.`);
-    }
-    
-    // Redirect to dashboard after a short delay
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 3000);
   };
   
   const resetEditor = () => {
-    if (selectedProblem) {
-      setCode(selectedProblem.starterCode || "// Start coding here");
-    } else {
-      setCode('// Start coding here in blind mode\n\nfunction example(input) {\n  // Your solution\n  return input;\n}\n\n// Test your code\nconsole.log(example("test"));');
-    }
+    setCode(getLanguageStarter(selectedLanguage));
     setOutput("");
     setElapsedTime(0);
     setIsTimerRunning(false);
@@ -171,7 +250,7 @@ const Playground = () => {
   };
 
   return (
-    <FullscreenManager onSubmit={submitCode}>
+    <FullscreenManager onExit={handleFullscreenExit} onSubmit={submitCode}>
       <div className="min-h-screen bg-gradient-to-b from-white to-purple-50 flex flex-col">
         <Header />
         
@@ -202,7 +281,7 @@ const Playground = () => {
               
               <div className="flex items-center gap-1 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
                 <Timer className="h-4 w-4" />
-                <span>{formatTime(elapsedTime)}</span>
+                <span className="font-medium">Time Left: {formatTime(timeLeft)}</span>
               </div>
             </div>
           </div>
@@ -217,10 +296,48 @@ const Playground = () => {
                     <h2 className="text-xl font-semibold font-orbito text-purple-800">Problem Details</h2>
                     
                     <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Previous Problem">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Previous Problem"
+                        onClick={() => {
+                          // Find previous problem in same difficulty
+                          const queryParams = new URLSearchParams(location.search);
+                          const passkey = queryParams.get('passkey');
+                          
+                          if (passkey && selectedProblem) {
+                            let filteredProblems = problems.filter(p => 
+                              (passkey === "easy" && p.difficulty === "Easy") ||
+                              (passkey === "medium" && p.difficulty === "Medium") ||
+                              (passkey === "hard" && p.difficulty === "Hard")
+                            );
+                            
+                            const currentIndex = filteredProblems.findIndex(p => p.id === selectedProblem.id);
+                            if (currentIndex > 0) {
+                              navigate(`/playground/${filteredProblems[currentIndex - 1].id}?passkey=${passkey}`);
+                            }
+                          }
+                        }}
+                      >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Next Problem">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Next Problem"
+                        onClick={() => {
+                          // Find next problem in same difficulty
+                          const queryParams = new URLSearchParams(location.search);
+                          const passkey = queryParams.get('passkey');
+                          
+                          if (passkey && selectedProblem) {
+                            let filteredProblems = problems.filter(p => 
+                              (passkey === "easy" && p.difficulty === "Easy") ||
+                              (passkey === "medium" && p.difficulty === "Medium") ||
+                              (passkey === "hard" && p.difficulty === "Hard")
+                            );
+                            
+                            const currentIndex = filteredProblems.findIndex(p => p.id === selectedProblem.id);
+                            if (currentIndex < filteredProblems.length - 1) {
+                              navigate(`/playground/${filteredProblems[currentIndex + 1].id}?passkey=${passkey}`);
+                            }
+                          }
+                        }}
+                      >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
@@ -264,12 +381,28 @@ const Playground = () => {
                       Editor
                     </TabsTrigger>
                     <TabsTrigger value="output" className="flex items-center gap-1">
-                      <Play className="h-4 w-4" />
+                      <AlertCircle className="h-4 w-4" />
                       Output
                     </TabsTrigger>
                   </TabsList>
                   
                   <div className="flex items-center gap-2">
+                    <Select
+                      value={selectedLanguage}
+                      onValueChange={setSelectedLanguage}
+                    >
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="javascript">JavaScript</SelectItem>
+                        <SelectItem value="python">Python</SelectItem>
+                        <SelectItem value="java">Java</SelectItem>
+                        <SelectItem value="c">C</SelectItem>
+                        <SelectItem value="cpp">C++</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -280,18 +413,9 @@ const Playground = () => {
                       Reset
                     </Button>
                     <Button 
-                      className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700"
-                      onClick={runCode}
-                      disabled={isRunning}
-                      size="sm"
-                    >
-                      {isRunning ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                      Run Code
-                    </Button>
-                    <Button 
                       className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
                       onClick={submitCode}
-                      disabled={isRunning}
+                      disabled={isSubmitting}
                       size="sm"
                     >
                       <Check className="h-4 w-4" />
@@ -304,7 +428,12 @@ const Playground = () => {
                   <div className="editor-container h-[calc(100vh-300px)] overflow-hidden flex flex-col">
                     <div className="p-2 bg-[#2D2B55] flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="font-medium">main.js</span>
+                        <span className="font-medium text-white">
+                          {selectedLanguage === "javascript" ? "main.js" : 
+                           selectedLanguage === "python" ? "main.py" :
+                           selectedLanguage === "java" ? "Solution.java" :
+                           selectedLanguage === "c" ? "main.c" : "main.cpp"}
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         {isBlindMode ? (
@@ -327,6 +456,8 @@ const Playground = () => {
                       className={`font-mono text-sm border-0 h-full p-4 focus-visible:ring-0 ${isBlindMode ? 'text-[#1E1E3F] bg-[#1E1E3F]' : 'text-gray-200 bg-[#1E1E3F]'}`}
                       placeholder="Start coding here..."
                       spellCheck={false}
+                      onCopy={(e) => e.preventDefault()} // Disable copy
+                      onPaste={(e) => e.preventDefault()} // Disable paste
                     />
                   </div>
                 </TabsContent>
@@ -338,7 +469,7 @@ const Playground = () => {
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-gray-400">
                         <AlertCircle className="h-12 w-12 mb-4 text-gray-500" />
-                        <p>Run your code to see output here</p>
+                        <p>Submit your code to see output here</p>
                       </div>
                     )}
                   </div>

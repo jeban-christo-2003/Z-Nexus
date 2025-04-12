@@ -11,10 +11,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
+import { toast } from "sonner";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  passkey: z.string().optional(),
 });
 
 const registerSchema = z.object({
@@ -31,6 +33,7 @@ const Login = () => {
   const [activeTab, setActiveTab] = useState<string>("login");
   const { user, login, register: authRegister } = useAuth();
   const navigate = useNavigate();
+  const [showPasskey, setShowPasskey] = useState(false);
 
   // Set the active tab based on the URL query parameter
   useEffect(() => {
@@ -44,7 +47,12 @@ const Login = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate(user.role === "admin" ? "/admin" : "/dashboard");
+      if (user.role === "admin") {
+        navigate("/admin");
+      } else {
+        // For students, don't automatically redirect
+        // They'll need to enter a passkey to access problems
+      }
     }
   }, [user, navigate]);
 
@@ -53,6 +61,7 @@ const Login = () => {
     defaultValues: {
       email: "",
       password: "",
+      passkey: "",
     },
   });
 
@@ -67,7 +76,36 @@ const Login = () => {
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     try {
+      // Check for admin credentials first
+      if (data.email === "Nexus_admin" && data.password === 'Z*N!E3X"U7#') {
+        // Admin login - special handling
+        await login(data.email, data.password);
+        // Admin always goes to admin dashboard
+        navigate('/admin');
+        return;
+      }
+      
+      // Regular user login
       await login(data.email, data.password);
+      
+      // After successful login, check if passkey was provided
+      if (data.passkey) {
+        // Validate passkey
+        if (["0000", "easy", "medium", "hard"].includes(data.passkey)) {
+          if (data.passkey === "0000") {
+            // Admin passkey - redirect to admin dashboard if they used the admin passkey
+            navigate('/admin');
+          } else {
+            // Valid difficulty passkey - redirect to correct problem set
+            navigate(`/playground?passkey=${data.passkey}`);
+          }
+        } else {
+          toast.error("Invalid passkey. Please try again.");
+        }
+      } else {
+        // No passkey, show dashboard
+        navigate('/dashboard');
+      }
     } catch (error) {
       // Error handling is done in the auth context
     }
@@ -76,6 +114,7 @@ const Login = () => {
   const onRegisterSubmit = async (data: RegisterFormValues) => {
     try {
       await authRegister(data.name, data.email, data.password);
+      setShowPasskey(true);
     } catch (error) {
       // Error handling is done in the auth context
     }
@@ -89,10 +128,10 @@ const Login = () => {
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-bold gradient-text">
-              Nexus
+              BlindCode
             </CardTitle>
             <CardDescription className="text-md">
-              Business meets Intelligence
+              Coding Challenges for Programmers
             </CardDescription>
           </CardHeader>
           
@@ -110,9 +149,9 @@ const Login = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="you@example.com" {...field} />
+                          <Input placeholder="username or email" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -133,6 +172,23 @@ const Login = () => {
                     )}
                   />
                   
+                  <FormField
+                    control={loginForm.control}
+                    name="passkey"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Passkey (Optional)</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Enter contest passkey" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        <p className="text-xs text-gray-500">
+                          Enter a passkey to access specific problem sets
+                        </p>
+                      </FormItem>
+                    )}
+                  />
+                  
                   <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={loginForm.formState.isSubmitting}>
                     {loginForm.formState.isSubmitting ? "Logging in..." : "Login"}
                   </Button>
@@ -141,61 +197,108 @@ const Login = () => {
             </TabsContent>
             
             <TabsContent value="register" className="px-6">
-              <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-                  <FormField
-                    control={registerForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={registerForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="you@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={registerForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={registerForm.formState.isSubmitting}>
-                    {registerForm.formState.isSubmitting ? "Registering..." : "Register"}
+              {showPasskey ? (
+                <div className="text-center py-4">
+                  <div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200">
+                    <h3 className="font-semibold text-green-700 mb-2">Registration Successful!</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Your account has been created. To participate in coding challenges, you'll need a passkey.
+                    </p>
+                    <div className="flex justify-center gap-4 flex-wrap">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          navigate('/playground?passkey=easy');
+                        }}
+                        className="bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+                      >
+                        Easy Problems
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          navigate('/playground?passkey=medium');
+                        }}
+                        className="bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+                      >
+                        Medium Problems
+                      </Button>
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          navigate('/playground?passkey=hard');
+                        }}
+                        className="bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
+                      >
+                        Hard Problems
+                      </Button>
+                    </div>
+                  </div>
+                  <Button
+                    variant="default"
+                    onClick={() => navigate('/dashboard')}
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                  >
+                    Go to Dashboard
                   </Button>
-                </form>
-              </Form>
+                </div>
+              ) : (
+                <Form {...registerForm}>
+                  <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+                    <FormField
+                      control={registerForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="you@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={registerForm.formState.isSubmitting}>
+                      {registerForm.formState.isSubmitting ? "Registering..." : "Register"}
+                    </Button>
+                  </form>
+                </Form>
+              )}
             </TabsContent>
           </Tabs>
           
           <CardFooter className="flex justify-center text-sm text-gray-500 mt-4">
             <p>
-              {activeTab === "login" ? "New to Nexus? " : "Already have an account? "}
+              {activeTab === "login" ? "New to BlindCode? " : "Already have an account? "}
               <button
                 type="button"
                 className="text-purple-600 hover:underline"

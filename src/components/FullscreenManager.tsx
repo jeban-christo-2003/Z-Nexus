@@ -1,133 +1,175 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { toast } from "sonner";
-import { useNavigate } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Maximize, AlertTriangle } from 'lucide-react';
 
 interface FullscreenManagerProps {
   children: React.ReactNode;
-  onSubmit: () => void;
+  onSubmit?: () => void;
+  onExit?: () => void;
 }
 
 const FullscreenManager: React.FC<FullscreenManagerProps> = ({ 
-  children,
-  onSubmit
+  children, 
+  onSubmit,
+  onExit
 }) => {
-  const navigate = useNavigate();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [exitWarningCount, setExitWarningCount] = useState(0);
-  const MAX_WARNINGS = 3;
 
-  // Enter fullscreen on component mount
-  useEffect(() => {
-    const enterFullscreen = async () => {
-      try {
-        const docElement = document.documentElement;
-        if (docElement.requestFullscreen) {
-          await docElement.requestFullscreen();
-          setIsFullscreen(true);
-          toast.info("Entered fullscreen mode");
-        }
-      } catch (error) {
-        console.error("Failed to enter fullscreen mode:", error);
-        toast.error("Failed to enter fullscreen mode");
-      }
-    };
-
-    enterFullscreen();
-
-    // Prevent tab switching with visibility API
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        toast.warning("Leaving the tab will be counted as a warning!");
-        handleExitAttempt();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  // Handle fullscreen change events
+  // Detect fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isCurrentlyFullscreen = !!document.fullscreenElement;
-      setIsFullscreen(isCurrentlyFullscreen);
+      const fullscreenElement = 
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement;
       
-      if (!isCurrentlyFullscreen) {
-        handleExitAttempt();
+      setIsFullscreen(!!fullscreenElement);
+      
+      // If exiting fullscreen and callback provided
+      if (!fullscreenElement && isFullscreen && onExit) {
+        onExit();
       }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    // Handle tab switching/visibility change
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && isFullscreen && onExit) {
+        onExit();
+      }
+    };
     
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [isFullscreen, onExit]);
 
-  // Handle copy/paste prevention
+  // Auto-enable fullscreen on mount
   useEffect(() => {
-    const preventCopyPaste = (e: ClipboardEvent) => {
-      e.preventDefault();
-      toast.warning("Copy and paste are disabled in this mode");
+    const enableFullscreen = async () => {
+      try {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if ((docEl as any).mozRequestFullScreen) {
+          await (docEl as any).mozRequestFullScreen();
+        } else if ((docEl as any).webkitRequestFullscreen) {
+          await (docEl as any).webkitRequestFullscreen();
+        } else if ((docEl as any).msRequestFullscreen) {
+          await (docEl as any).msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } catch (error) {
+        console.error('Error attempting to enable fullscreen:', error);
+      }
     };
-
-    document.addEventListener('copy', preventCopyPaste);
-    document.addEventListener('paste', preventCopyPaste);
-    document.addEventListener('cut', preventCopyPaste);
-
-    return () => {
-      document.removeEventListener('copy', preventCopyPaste);
-      document.removeEventListener('paste', preventCopyPaste);
-      document.removeEventListener('cut', preventCopyPaste);
-    };
+    
+    if (!isFullscreen) {
+      enableFullscreen();
+    }
   }, []);
 
-  const handleExitAttempt = useCallback(() => {
-    const newCount = exitWarningCount + 1;
-    setExitWarningCount(newCount);
-    
-    if (newCount < MAX_WARNINGS) {
-      toast.warning(`Exiting fullscreen: Warning ${newCount}/${MAX_WARNINGS}`, {
-        icon: <AlertTriangle className="h-4 w-4" />,
-        description: `Your work will be automatically submitted after ${MAX_WARNINGS} warnings.`
-      });
-      
-      // Re-enter fullscreen after warning if possible
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(err => {
-          console.error(`Error attempting to re-enable fullscreen: ${err.message}`);
-        });
-      }
-    } else {
-      toast.error("Maximum warnings reached. Your work will be submitted and the session will end.", {
-        duration: 5000
-      });
-      
-      // Submit the work and exit
-      onSubmit();
-      setTimeout(() => {
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
+  const toggleFullscreen = async () => {
+    try {
+      if (!isFullscreen) {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if ((docEl as any).mozRequestFullScreen) {
+          await (docEl as any).mozRequestFullScreen();
+        } else if ((docEl as any).webkitRequestFullscreen) {
+          await (docEl as any).webkitRequestFullscreen();
+        } else if ((docEl as any).msRequestFullscreen) {
+          await (docEl as any).msRequestFullscreen();
         }
-        navigate('/dashboard');
-      }, 3000);
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+      }
+    } catch (error) {
+      console.error('Error attempting to toggle fullscreen:', error);
     }
-  }, [exitWarningCount, navigate, onSubmit]);
+  };
+
+  // Keyboard handler for Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent default Escape key behavior
+      if (e.key === 'Escape' && isFullscreen) {
+        e.preventDefault();
+        
+        // Custom handling for Escape key
+        if (onExit) {
+          onExit();
+        }
+        
+        // Re-enable fullscreen after a small delay
+        setTimeout(() => {
+          if (!isFullscreen) {
+            toggleFullscreen();
+          }
+        }, 100);
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullscreen, onExit]);
 
   return (
-    <div className="fullscreen-container">
-      {isFullscreen && (
-        <div className="fixed top-0 right-0 bg-red-600 text-white px-2 py-1 text-xs z-50">
-          Fullscreen Mode - Exit Warning: {exitWarningCount}/{MAX_WARNINGS}
+    <>
+      {children}
+      
+      {!isFullscreen && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Button 
+            onClick={toggleFullscreen}
+            className="bg-purple-600 hover:bg-purple-700 flex items-center gap-2"
+          >
+            <Maximize className="h-4 w-4" />
+            Enter Fullscreen Mode
+          </Button>
         </div>
       )}
-      {children}
-    </div>
+      
+      {!isFullscreen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-40">
+          <div className="bg-white p-6 rounded-lg max-w-md text-center">
+            <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-2">Fullscreen Required</h2>
+            <p className="mb-4">To prevent cheating, you must enter fullscreen mode to continue the coding test.</p>
+            <Button 
+              onClick={toggleFullscreen}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Enter Fullscreen Mode
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

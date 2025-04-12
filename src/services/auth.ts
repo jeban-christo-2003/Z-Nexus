@@ -17,7 +17,7 @@ const USERS: User[] = [
   {
     id: "1",
     name: "Admin User",
-    email: "admin@nexus.com",
+    email: "Nexus_admin",
     role: "admin",
   },
   {
@@ -50,9 +50,21 @@ export const login = (email: string, password: string): Promise<User> => {
   return new Promise((resolve, reject) => {
     // Simulate API delay
     setTimeout(() => {
+      // Special case for admin
+      if (email === "Nexus_admin" && password === 'Z*N!E3X"U7#') {
+        const adminUser = USERS.find(u => u.email === email);
+        if (adminUser) {
+          currentUser = adminUser;
+          localStorage.setItem("nexus_user", JSON.stringify(adminUser));
+          resolve(adminUser);
+          return;
+        }
+      }
+      
+      // Regular user login
       const user = USERS.find(u => u.email === email);
       
-      // For demo purposes, any password works
+      // For demo purposes, any password works for regular users
       if (user) {
         currentUser = user;
         localStorage.setItem("nexus_user", JSON.stringify(user));
