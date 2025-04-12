@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAllUsers, addParticipant, removeParticipant, getUsersByRound } from "@/services/auth";
+import { getAllUsers, addParticipant, removeParticipant, getUsersByRound, getAllProblems, deleteProblem } from "@/services/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { format, parseISO } from "date-fns";
 import { 
   ChevronLeft, 
   Users, 
@@ -30,10 +31,14 @@ import {
   ChevronRight,
   Trash2,
   Edit,
-  Save
+  Save,
+  Clock,
+  CheckCircle,
+  FileCode
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { problems } from "@/data/problems";
+import { problems as defaultProblems } from "@/data/problems";
+import ProblemEditor from "@/components/ProblemEditor";
 
 // Form schema for adding participants
 const addParticipantSchema = z.object({
@@ -47,12 +52,18 @@ const AdminDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const allUsers = getAllUsers();
+  const customProblems = getAllProblems();
+  const allProblems = [...defaultProblems, ...customProblems];
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<"name" | "score">("score");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [activeTab, setActiveTab] = useState("users");
   const [selectedRound, setSelectedRound] = useState("1");
   const [confirmDeleteUserId, setConfirmDeleteUserId] = useState<string | null>(null);
+  const [confirmDeleteProblemId, setConfirmDeleteProblemId] = useState<number | null>(null);
+  const [editingProblemId, setEditingProblemId] = useState<number | null>(null);
+  const [isProblemEditorOpen, setIsProblemEditorOpen] = useState(false);
   
   // Form for adding new participants
   const addParticipantForm = useForm<AddParticipantFormValues>({
@@ -107,6 +118,26 @@ const AdminDashboard = () => {
       setConfirmDeleteUserId(null);
     }
   };
+  
+  // Handle delete problem
+  const handleDeleteProblem = (problemId: number) => {
+    if (deleteProblem(problemId)) {
+      setConfirmDeleteProblemId(null);
+    } else {
+      toast.error("Cannot delete default problems");
+      setConfirmDeleteProblemId(null);
+    }
+  };
+  
+  // Handle open problem editor for creating or editing
+  const openProblemEditor = (problemId?: number) => {
+    if (problemId) {
+      setEditingProblemId(problemId);
+    } else {
+      setEditingProblemId(null);
+    }
+    setIsProblemEditorOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-purple-50 flex flex-col">
@@ -134,7 +165,7 @@ const AdminDashboard = () => {
               Leaderboard
             </TabsTrigger>
             <TabsTrigger value="problems" className="flex items-center gap-1">
-              <Plus className="h-4 w-4" />
+              <FileCode className="h-4 w-4" />
               Problem Sets
             </TabsTrigger>
           </TabsList>
@@ -265,7 +296,9 @@ const AdminDashboard = () => {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
+                        <TableHead>Problems Solved</TableHead>
                         <TableHead>Score</TableHead>
+                        <TableHead>Last Submission</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -284,7 +317,13 @@ const AdminDashboard = () => {
                               {user.role}
                             </span>
                           </TableCell>
+                          <TableCell>{user.problemsSolved || 0}</TableCell>
                           <TableCell>{user.score !== undefined ? user.score : "N/A"}</TableCell>
+                          <TableCell>
+                            {user.lastSubmission 
+                              ? format(parseISO(user.lastSubmission), "MMM d, yyyy")
+                              : "N/A"}
+                          </TableCell>
                           <TableCell>
                             {user.role !== "admin" && (
                               <div className="flex space-x-2">
@@ -394,62 +433,57 @@ const AdminDashboard = () => {
               </CardHeader>
               
               <CardContent>
-                <div className="space-y-4">
-                  {sortedStudents.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      No students match your search criteria
-                    </div>
-                  ) : (
-                    sortedStudents.map((student, index) => (
-                      <div 
-                        key={student.id} 
-                        className={`flex items-center justify-between p-4 rounded-lg 
-                          ${index === 0 ? "bg-yellow-50 border border-yellow-100" : 
-                            index === 1 ? "bg-gray-50 border border-gray-100" : 
-                              index === 2 ? "bg-amber-50 border border-amber-100" : 
-                                "bg-white border border-gray-100"}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg
-                            ${index === 0 ? "bg-yellow-200 text-yellow-800" : 
-                              index === 1 ? "bg-gray-200 text-gray-800" : 
-                                index === 2 ? "bg-amber-200 text-amber-800" : 
-                                  "bg-purple-100 text-purple-800"}`}>
-                            {index + 1}
-                          </div>
-                          
-                          <div>
-                            <h3 className="font-medium">{student.name}</h3>
-                            <p className="text-sm text-gray-500">{student.email}</p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <div className="text-sm text-gray-500">
-                              {selectedRound !== "all" ? `Round ${selectedRound} Score` : "Overall Score"}
-                            </div>
-                            <div className="text-xl font-bold text-purple-700">
+                <div className="rounded-lg border shadow-sm overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Rank</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Problems Solved</TableHead>
+                        <TableHead>Last Submission</TableHead>
+                        <TableHead>Score</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedStudents.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                            No students match your search criteria
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        sortedStudents.map((student, index) => (
+                          <TableRow key={student.id}>
+                            <TableCell>
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold ${
+                                index === 0 
+                                  ? "bg-yellow-100 text-yellow-700" 
+                                  : index === 1 
+                                    ? "bg-gray-200 text-gray-700" 
+                                    : index === 2 
+                                      ? "bg-amber-100 text-amber-700" 
+                                      : "bg-purple-100 text-purple-700"
+                              }`}>
+                                {index + 1}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-medium">{student.name}</TableCell>
+                            <TableCell>{student.problemsSolved || 0}</TableCell>
+                            <TableCell>
+                              {student.lastSubmission 
+                                ? format(parseISO(student.lastSubmission), "MMM d, yyyy")
+                                : "Never"}
+                            </TableCell>
+                            <TableCell className="font-bold text-purple-700">
                               {selectedRound !== "all" && student.rounds 
-                                ? student.rounds[selectedRound] || 0 
+                                ? student.rounds[selectedRound] || 0
                                 : student.score || 0}
-                            </div>
-                          </div>
-                          
-                          <div className={`px-3 py-1 rounded-full text-xs font-medium
-                            ${index === 0 ? "bg-yellow-100 text-yellow-800" : 
-                              index === 1 ? "bg-gray-100 text-gray-800" : 
-                                index === 2 ? "bg-amber-100 text-amber-800" : 
-                                  "bg-blue-100 text-blue-800"}`}>
-                            {index === 0 ? "Gold" : 
-                              index === 1 ? "Silver" : 
-                                index === 2 ? "Bronze" : 
-                                  `Rank #${index + 1}`}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
               
@@ -490,7 +524,7 @@ const AdminDashboard = () => {
                     <TabsContent value="round1" className="space-y-6">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">Round 1 Problems</h3>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => openProblemEditor()}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add New Problem
                         </Button>
@@ -511,11 +545,12 @@ const AdminDashboard = () => {
                                 <TableHead>Title</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Passkey</TableHead>
+                                <TableHead>Test Cases</TableHead>
                                 <TableHead>Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {problems
+                              {allProblems
                                 .filter(p => p.difficulty === "Easy")
                                 .map(problem => (
                                   <TableRow key={problem.id}>
@@ -524,16 +559,21 @@ const AdminDashboard = () => {
                                     <TableCell>{problem.category}</TableCell>
                                     <TableCell>
                                       <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs inline-block">
-                                        easy
+                                        {problem.passkey || "easy"}
                                       </div>
                                     </TableCell>
                                     <TableCell>
+                                      {problem.testCases ? problem.testCases.length : "N/A"}
+                                    </TableCell>
+                                    <TableCell>
                                       <div className="flex space-x-2">
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                          <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                                          onClick={() => openProblemEditor(problem.id)}>
                                           <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                                          onClick={() => setConfirmDeleteProblemId(problem.id)}>
+                                          <Trash2 className="h-4 w-4 text-red-500" />
                                         </Button>
                                       </div>
                                     </TableCell>
@@ -551,11 +591,12 @@ const AdminDashboard = () => {
                                 <TableHead>Title</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Passkey</TableHead>
+                                <TableHead>Test Cases</TableHead>
                                 <TableHead>Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {problems
+                              {allProblems
                                 .filter(p => p.difficulty === "Medium")
                                 .map(problem => (
                                   <TableRow key={problem.id}>
@@ -564,16 +605,21 @@ const AdminDashboard = () => {
                                     <TableCell>{problem.category}</TableCell>
                                     <TableCell>
                                       <div className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs inline-block">
-                                        medium
+                                        {problem.passkey || "medium"}
                                       </div>
                                     </TableCell>
                                     <TableCell>
+                                      {problem.testCases ? problem.testCases.length : "N/A"}
+                                    </TableCell>
+                                    <TableCell>
                                       <div className="flex space-x-2">
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                          <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                                          onClick={() => openProblemEditor(problem.id)}>
                                           <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                                          onClick={() => setConfirmDeleteProblemId(problem.id)}>
+                                          <Trash2 className="h-4 w-4 text-red-500" />
                                         </Button>
                                       </div>
                                     </TableCell>
@@ -591,11 +637,12 @@ const AdminDashboard = () => {
                                 <TableHead>Title</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Passkey</TableHead>
+                                <TableHead>Test Cases</TableHead>
                                 <TableHead>Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {problems
+                              {allProblems
                                 .filter(p => p.difficulty === "Hard")
                                 .map(problem => (
                                   <TableRow key={problem.id}>
@@ -604,16 +651,21 @@ const AdminDashboard = () => {
                                     <TableCell>{problem.category}</TableCell>
                                     <TableCell>
                                       <div className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs inline-block">
-                                        hard
+                                        {problem.passkey || "hard"}
                                       </div>
                                     </TableCell>
                                     <TableCell>
+                                      {problem.testCases ? problem.testCases.length : "N/A"}
+                                    </TableCell>
+                                    <TableCell>
                                       <div className="flex space-x-2">
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                          <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                                          onClick={() => openProblemEditor(problem.id)}>
                                           <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                                          onClick={() => setConfirmDeleteProblemId(problem.id)}>
+                                          <Trash2 className="h-4 w-4 text-red-500" />
                                         </Button>
                                       </div>
                                     </TableCell>
@@ -628,7 +680,7 @@ const AdminDashboard = () => {
                     <TabsContent value="round2" className="space-y-6">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">Round 2 Problems</h3>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => openProblemEditor()}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add New Problem
                         </Button>
@@ -642,7 +694,7 @@ const AdminDashboard = () => {
                     <TabsContent value="round3" className="space-y-6">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">Round 3 Problems</h3>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => openProblemEditor()}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add New Problem
                         </Button>
@@ -656,6 +708,37 @@ const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+            
+            {/* Delete Problem Confirmation Dialog */}
+            <Dialog open={!!confirmDeleteProblemId} onOpenChange={(open) => !open && setConfirmDeleteProblemId(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Confirm Problem Deletion</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete this problem? This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setConfirmDeleteProblemId(null)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={() => confirmDeleteProblemId && handleDeleteProblem(confirmDeleteProblemId)}
+                  >
+                    Delete Problem
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Problem Editor Dialog */}
+            <ProblemEditor 
+              open={isProblemEditorOpen} 
+              onClose={() => setIsProblemEditorOpen(false)}
+              problemId={editingProblemId || undefined}
+              round={selectedRound}
+            />
           </TabsContent>
         </Tabs>
       </main>

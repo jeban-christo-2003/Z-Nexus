@@ -7,11 +7,13 @@ import { toast } from "sonner";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: "admin" | "student";
+  adminRestricted?: boolean; // New prop to restrict admin from certain pages
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  requiredRole 
+  requiredRole,
+  adminRestricted
 }) => {
   const { user, loading } = useAuth();
 
@@ -22,6 +24,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!user) {
     toast.error("You must be logged in to access this page");
     return <Navigate to="/login" replace />;
+  }
+
+  // If page is admin-restricted and user is admin, redirect to admin dashboard
+  if (adminRestricted && user.role === "admin") {
+    toast.error("This page is only available for students");
+    return <Navigate to="/admin" replace />;
   }
 
   if (requiredRole && user.role !== requiredRole) {

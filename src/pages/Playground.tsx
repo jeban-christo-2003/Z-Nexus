@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { toast as sonnerToast } from "sonner";
 import { problems } from '@/data/problems';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserScore } from '@/services/auth';
+import { updateUserScore, validateCode } from '@/services/auth';
 import FullscreenManager from '@/components/FullscreenManager';
 
 const Playground = () => {
@@ -40,6 +40,13 @@ const Playground = () => {
   const [exitWarningCount, setExitWarningCount] = useState(0);
   const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
   
+  // Start timer automatically when problem is loaded
+  useEffect(() => {
+    if (selectedProblem && !isTimerRunning) {
+      setIsTimerRunning(true);
+    }
+  }, [selectedProblem]);
+  
   // Check if we reached the time limit
   useEffect(() => {
     if (timeLeft <= 0 && isTimerRunning) {
@@ -55,6 +62,7 @@ const Playground = () => {
     if (isTimerRunning) {
       intervalId = window.setInterval(() => {
         setTimeLeft(prevTime => Math.max(0, prevTime - 1));
+        setElapsedTime(prevTime => prevTime + 1);
       }, 1000);
     }
     
@@ -65,6 +73,10 @@ const Playground = () => {
   
   // Get language placeholder or starter code
   const getLanguageStarter = (language: string) => {
+    if (selectedProblem && selectedProblem.starterCode) {
+      return selectedProblem.starterCode;
+    }
+    
     switch (language) {
       case "javascript":
         return "// Write your JavaScript solution here\n\nfunction solution(input) {\n  // Your code here\n}\n";
@@ -115,6 +127,8 @@ const Playground = () => {
         if (problem) {
           setSelectedProblem(problem);
           setCode(getLanguageStarter(selectedLanguage));
+          // Start timer automatically
+          setIsTimerRunning(true);
         } else {
           // If problem not found, redirect to first problem in filtered list
           if (filteredProblems.length > 0) {
@@ -130,6 +144,8 @@ const Playground = () => {
       if (problem) {
         setSelectedProblem(problem);
         setCode(getLanguageStarter(selectedLanguage));
+        // Start timer automatically
+        setIsTimerRunning(true);
       }
     } else {
       // No passkey and no problem ID, show empty editor
@@ -155,9 +171,6 @@ const Playground = () => {
   };
   
   const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    if (!isTimerRunning) {
-      setIsTimerRunning(true);
-    }
     setCode(e.target.value);
   };
   
@@ -187,11 +200,40 @@ const Playground = () => {
         if (selectedProblem) {
           const testOutput = `Evaluating submission for "${selectedProblem.title}"...\n\n`;
           
-          // Simulate test results - in real implementation would run actual tests
-          const passedTests = Math.random() > 0.3; // 70% pass chance for demo
+          // Simulate test results with validation
+          let passedTests = false;
+          let testResults;
+          
+          if (selectedProblem.testCases && selectedProblem.testCases.length > 0) {
+            // Use the validation function from auth.ts
+            const validation = validateCode(code, selectedProblem.id);
+            passedTests = validation.passed;
+            
+            // Build test results output
+            let resultsOutput = "";
+            validation.results.forEach((result, index) => {
+              if (!selectedProblem.testCases[index].isHidden) {
+                resultsOutput += `Test ${index + 1}:\n`;
+                resultsOutput += `Input: ${result.input}\n`;
+                resultsOutput += `Expected: ${result.expected}\n`;
+                resultsOutput += `Actual: ${result.actual}\n`;
+                resultsOutput += `${result.passed ? "✅ Passed" : "❌ Failed"}\n\n`;
+              } else if (!result.passed) {
+                resultsOutput += `Hidden Test ${index + 1}: ❌ Failed\n\n`;
+              }
+            });
+            
+            testResults = resultsOutput;
+          } else {
+            // Fallback for problems without test cases
+            passedTests = Math.random() > 0.3; // 70% pass chance for demo
+            testResults = passedTests 
+              ? "All tests passed!" 
+              : "Some tests failed. Expected: [1, 2, 3]\nActual: [1, 2, 4]";
+          }
           
           if (passedTests) {
-            setOutput(`${testOutput}✅ All tests passed!\n\nYour solution successfully solved the problem.`);
+            setOutput(`${testOutput}✅ All tests passed!\n\n${testResults}\n\nYour solution successfully solved the problem.`);
             toast({
               title: "Success!",
               description: "Your code passed all test cases!",
@@ -207,11 +249,12 @@ const Playground = () => {
               const timeBonus = Math.max(0, (25 * 60 - elapsedTime)) / 60; // Time bonus based on time left
               const scoreGain = Math.round(10 * difficultyMultiplier + timeBonus);
               
-              updateUserScore(user.id, (user.score || 0) + scoreGain);
+              // Pass the problem ID to update submission records
+              updateUserScore(user.id, (user.score || 0) + scoreGain, "1", selectedProblem.id);
               sonnerToast.success(`You earned ${scoreGain} points!`);
             }
           } else {
-            setOutput(`${testOutput}❌ Some tests failed\n\nExpected: [1, 2, 3]\nActual: [1, 2, 4]`);
+            setOutput(`${testOutput}❌ Some tests failed\n\n${testResults}`);
             toast({
               title: "Tests Failed",
               description: "Some test cases did not pass. Check the output for details.",
@@ -239,8 +282,9 @@ const Playground = () => {
   const resetEditor = () => {
     setCode(getLanguageStarter(selectedLanguage));
     setOutput("");
+    setIsTimerRunning(true); // Restart timer on reset
+    setTimeLeft(25 * 60); // Reset time to 25 minutes
     setElapsedTime(0);
-    setIsTimerRunning(false);
     setShowResults(false);
     
     toast({

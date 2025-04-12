@@ -45,7 +45,7 @@ const App = () => (
             <Route 
               path="/playground" 
               element={
-                <ProtectedRoute requiredRole="student">
+                <ProtectedRoute requiredRole="student" adminRestricted={true}>
                   <Playground />
                 </ProtectedRoute>
               } 
@@ -53,7 +53,7 @@ const App = () => (
             <Route 
               path="/playground/:id" 
               element={
-                <ProtectedRoute requiredRole="student">
+                <ProtectedRoute requiredRole="student" adminRestricted={true}>
                   <Playground />
                 </ProtectedRoute>
               } 
